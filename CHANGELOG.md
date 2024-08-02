@@ -1,3 +1,42 @@
+# 0.25.0 (July 21, 2024)
+
+### Breaking Changes
+
+- Upgrade to opentelemetry 0.24. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/releases/tag/opentelemetry-0.24.0)
+  for more information.
+
+### Fixed
+
+- Invalidate sample decision on set parent (#153)
+- chore: fix on_close() comment (#148)
+
+# 0.24.0 (May 24, 2024)
+
+### Breaking Changes
+
+- Upgrade to opentelemetry 0.23. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/releases/tag/opentelemetry-0.23.0)
+  for more information.
+
+### Added
+
+- Added gauge metrics (#129)
+
+### Fixed
+
+- Fixed compilation on WASI targets (#147)
+- Set span end time when it exists (#124)
+
+# 0.23.0 (February 26, 2024)
+
+### Breaking Changes
+
+- Upgrade to opentelemetry 0.22. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/releases/tag/v0.22.0)
+  for more information. In particular, i64 histograms will silently downgrade to
+  key/value exports.
+
 # 0.22.0 (November 7, 2023)
 
 ### Breaking Changes

@@ -2,6 +2,8 @@ use std::{collections::HashMap, fmt, sync::RwLock};
 use tracing::{field::Visit, Subscriber};
 use tracing_core::{Field, Interest, Metadata};
 
+#[cfg(feature = "metrics_gauge_unstable")]
+use opentelemetry::metrics::Gauge;
 use opentelemetry::{
     metrics::{Counter, Histogram, Meter, MeterProvider, UpDownCounter},
     KeyValue, Value,
@@ -21,6 +23,9 @@ const INSTRUMENTATION_LIBRARY_NAME: &str = "tracing/tracing-opentelemetry";
 const METRIC_PREFIX_MONOTONIC_COUNTER: &str = "monotonic_counter.";
 const METRIC_PREFIX_COUNTER: &str = "counter.";
 const METRIC_PREFIX_HISTOGRAM: &str = "histogram.";
+#[cfg(feature = "metrics_gauge_unstable")]
+const METRIC_PREFIX_GAUGE: &str = "gauge.";
+
 const I64_MAX: u64 = i64::MAX as u64;
 
 #[derive(Default)]
@@ -30,8 +35,13 @@ pub(crate) struct Instruments {
     i64_up_down_counter: MetricsMap<UpDownCounter<i64>>,
     f64_up_down_counter: MetricsMap<UpDownCounter<f64>>,
     u64_histogram: MetricsMap<Histogram<u64>>,
-    i64_histogram: MetricsMap<Histogram<i64>>,
     f64_histogram: MetricsMap<Histogram<f64>>,
+    #[cfg(feature = "metrics_gauge_unstable")]
+    u64_gauge: MetricsMap<Gauge<u64>>,
+    #[cfg(feature = "metrics_gauge_unstable")]
+    i64_gauge: MetricsMap<Gauge<i64>>,
+    #[cfg(feature = "metrics_gauge_unstable")]
+    f64_gauge: MetricsMap<Gauge<f64>>,
 }
 
 type MetricsMap<T> = RwLock<HashMap<&'static str, T>>;
@@ -43,8 +53,13 @@ pub(crate) enum InstrumentType {
     UpDownCounterI64(i64),
     UpDownCounterF64(f64),
     HistogramU64(u64),
-    HistogramI64(i64),
     HistogramF64(f64),
+    #[cfg(feature = "metrics_gauge_unstable")]
+    GaugeU64(u64),
+    #[cfg(feature = "metrics_gauge_unstable")]
+    GaugeI64(i64),
+    #[cfg(feature = "metrics_gauge_unstable")]
+    GaugeF64(f64),
 }
 
 impl Instruments {
@@ -119,19 +134,38 @@ impl Instruments {
                     |rec| rec.record(value, attributes),
                 );
             }
-            InstrumentType::HistogramI64(value) => {
-                update_or_insert(
-                    &self.i64_histogram,
-                    metric_name,
-                    || meter.i64_histogram(metric_name).init(),
-                    |rec| rec.record(value, attributes),
-                );
-            }
             InstrumentType::HistogramF64(value) => {
                 update_or_insert(
                     &self.f64_histogram,
                     metric_name,
                     || meter.f64_histogram(metric_name).init(),
+                    |rec| rec.record(value, attributes),
+                );
+            }
+            #[cfg(feature = "metrics_gauge_unstable")]
+            InstrumentType::GaugeU64(value) => {
+                update_or_insert(
+                    &self.u64_gauge,
+                    metric_name,
+                    || meter.u64_gauge(metric_name).init(),
+                    |rec| rec.record(value, attributes),
+                );
+            }
+            #[cfg(feature = "metrics_gauge_unstable")]
+            InstrumentType::GaugeI64(value) => {
+                update_or_insert(
+                    &self.i64_gauge,
+                    metric_name,
+                    || meter.i64_gauge(metric_name).init(),
+                    |rec| rec.record(value, attributes),
+                );
+            }
+            #[cfg(feature = "metrics_gauge_unstable")]
+            InstrumentType::GaugeF64(value) => {
+                update_or_insert(
+                    &self.f64_gauge,
+                    metric_name,
+                    || meter.f64_gauge(metric_name).init(),
                     |rec| rec.record(value, attributes),
                 );
             }
@@ -145,11 +179,18 @@ pub(crate) struct MetricVisitor<'a> {
 }
 
 impl<'a> Visit for MetricVisitor<'a> {
-    fn record_debug(&mut self, _field: &Field, _value: &dyn fmt::Debug) {
-        // Do nothing
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        self.attributes
+            .push(KeyValue::new(field.name(), format!("{value:?}")));
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
+        #[cfg(feature = "metrics_gauge_unstable")]
+        if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_GAUGE) {
+            self.visited_metrics
+                .push((metric_name, InstrumentType::GaugeU64(value)));
+            return;
+        }
         if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_MONOTONIC_COUNTER) {
             self.visited_metrics
                 .push((metric_name, InstrumentType::CounterU64(value)));
@@ -175,6 +216,12 @@ impl<'a> Visit for MetricVisitor<'a> {
     }
 
     fn record_f64(&mut self, field: &Field, value: f64) {
+        #[cfg(feature = "metrics_gauge_unstable")]
+        if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_GAUGE) {
+            self.visited_metrics
+                .push((metric_name, InstrumentType::GaugeF64(value)));
+            return;
+        }
         if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_MONOTONIC_COUNTER) {
             self.visited_metrics
                 .push((metric_name, InstrumentType::CounterF64(value)));
@@ -191,15 +238,18 @@ impl<'a> Visit for MetricVisitor<'a> {
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
+        #[cfg(feature = "metrics_gauge_unstable")]
+        if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_GAUGE) {
+            self.visited_metrics
+                .push((metric_name, InstrumentType::GaugeI64(value)));
+            return;
+        }
         if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_MONOTONIC_COUNTER) {
             self.visited_metrics
                 .push((metric_name, InstrumentType::CounterU64(value as u64)));
         } else if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_COUNTER) {
             self.visited_metrics
                 .push((metric_name, InstrumentType::UpDownCounterI64(value)));
-        } else if let Some(metric_name) = field.name().strip_prefix(METRIC_PREFIX_HISTOGRAM) {
-            self.visited_metrics
-                .push((metric_name, InstrumentType::HistogramI64(value)));
         } else {
             self.attributes.push(KeyValue::new(field.name(), value));
         }
@@ -230,12 +280,12 @@ impl<'a> Visit for MetricVisitor<'a> {
 /// use tracing_opentelemetry::MetricsLayer;
 /// use tracing_subscriber::layer::SubscriberExt;
 /// use tracing_subscriber::Registry;
-/// # use opentelemetry_sdk::metrics::MeterProvider;
+/// # use opentelemetry_sdk::metrics::SdkMeterProvider;
 ///
 /// // Constructing a MeterProvider is out-of-scope for the docs here, but there
 /// // are examples in the opentelemetry repository. See:
 /// // https://github.com/open-telemetry/opentelemetry-rust/blob/dfeac078ff7853e7dc814778524b93470dfa5c9c/examples/metrics-basic/src/main.rs#L7
-/// # let meter_provider: MeterProvider = unimplemented!();
+/// # let meter_provider: SdkMeterProvider = unimplemented!();
 ///
 /// let opentelemetry_metrics =  MetricsLayer::new(meter_provider);
 /// let subscriber = Registry::default().with(opentelemetry_metrics);
@@ -317,7 +367,7 @@ impl<'a> Visit for MetricVisitor<'a> {
 /// # use tracing::info;
 /// // adds attributes bar="baz" and qux=2 to the `foo` counter.
 /// info!(monotonic_counter.foo = 1, bar = "baz", qux = 2);
-/// ```      
+/// ```
 ///
 /// # Implementation Details
 ///
@@ -370,9 +420,20 @@ impl MetricsFilter {
         meta.is_event()
             && meta.fields().iter().any(|field| {
                 let name = field.name();
-                name.starts_with(METRIC_PREFIX_COUNTER)
+
+                if name.starts_with(METRIC_PREFIX_COUNTER)
                     || name.starts_with(METRIC_PREFIX_MONOTONIC_COUNTER)
                     || name.starts_with(METRIC_PREFIX_HISTOGRAM)
+                {
+                    return true;
+                }
+
+                #[cfg(feature = "metrics_gauge_unstable")]
+                if name.starts_with(METRIC_PREFIX_GAUGE) {
+                    return true;
+                }
+
+                false
             })
     }
 }
