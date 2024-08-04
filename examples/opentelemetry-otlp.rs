@@ -1,8 +1,8 @@
-use opentelemetry::{global, Key, KeyValue};
+use opentelemetry::{global, trace::TracerProvider, Key, KeyValue};
 use opentelemetry_sdk::{
     metrics::{
         reader::{DefaultAggregationSelector, DefaultTemporalitySelector},
-        Aggregation, Instrument, MeterProvider, PeriodicReader, Stream,
+        Aggregation, Instrument, MeterProviderBuilder, PeriodicReader, SdkMeterProvider, Stream,
     },
     runtime,
     trace::{BatchConfig, RandomIdGenerator, Sampler, Tracer},
@@ -29,7 +29,7 @@ fn resource() -> Resource {
 }
 
 // Construct MeterProvider for MetricsLayer
-fn init_meter_provider() -> MeterProvider {
+fn init_meter_provider() -> SdkMeterProvider {
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
         .build_metrics_exporter(
@@ -78,7 +78,7 @@ fn init_meter_provider() -> MeterProvider {
         }
     };
 
-    let meter_provider = MeterProvider::builder()
+    let meter_provider = MeterProviderBuilder::default()
         .with_resource(resource())
         .with_reader(reader)
         .with_reader(stdout_reader)
@@ -93,7 +93,7 @@ fn init_meter_provider() -> MeterProvider {
 
 // Construct Tracer for OpenTelemetryLayer
 fn init_tracer() -> Tracer {
-    opentelemetry_otlp::new_pipeline()
+    let provider = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_trace_config(
             opentelemetry_sdk::trace::Config::default()
@@ -108,12 +108,16 @@ fn init_tracer() -> Tracer {
         .with_batch_config(BatchConfig::default())
         .with_exporter(opentelemetry_otlp::new_exporter().tonic())
         .install_batch(runtime::Tokio)
-        .unwrap()
+        .unwrap();
+
+    global::set_tracer_provider(provider.clone());
+    provider.tracer("tracing-otel-subscriber")
 }
 
 // Initialize tracing-subscriber and return OtelGuard for opentelemetry-related termination processing
 fn init_tracing_subscriber() -> OtelGuard {
     let meter_provider = init_meter_provider();
+    let tracer = init_tracer();
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::filter::LevelFilter::from_level(
@@ -121,14 +125,14 @@ fn init_tracing_subscriber() -> OtelGuard {
         ))
         .with(tracing_subscriber::fmt::layer())
         .with(MetricsLayer::new(meter_provider.clone()))
-        .with(OpenTelemetryLayer::new(init_tracer()))
+        .with(OpenTelemetryLayer::new(tracer))
         .init();
 
     OtelGuard { meter_provider }
 }
 
 struct OtelGuard {
-    meter_provider: MeterProvider,
+    meter_provider: SdkMeterProvider,
 }
 
 impl Drop for OtelGuard {
