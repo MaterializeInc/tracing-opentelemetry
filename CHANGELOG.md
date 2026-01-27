@@ -1,3 +1,98 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.32.1](https://github.com/tokio-rs/tracing-opentelemetry/compare/v0.32.0...v0.32.1) - 2025-12-17
+
+### Added
+
+- allow OpenTelemetry context access with SpanRef ([#234](https://github.com/tokio-rs/tracing-opentelemetry/pull/234))
+- add event-counting filtering layer for spans ([#228](https://github.com/tokio-rs/tracing-opentelemetry/pull/228))
+- publicly export `SetParentError`
+
+### Fixed
+
+- fix panic in multithreaded follows-from
+
+### Other
+
+- Remove unwanted dependency on opentelemetry sdk crate ([#241](https://github.com/tokio-rs/tracing-opentelemetry/pull/241))
+- update README.md links to use the latest version ([#239](https://github.com/tokio-rs/tracing-opentelemetry/pull/239))
+- remove thiserror and unused dependencies ([#238](https://github.com/tokio-rs/tracing-opentelemetry/pull/238))
+
+## [0.32.0](https://github.com/tokio-rs/tracing-opentelemetry/compare/v0.31.0...v0.32.0) - 2025-09-29
+
+### Added
+
+- Add configuration for including `target` in spans ([#222](https://github.com/tokio-rs/tracing-opentelemetry/pull/222))
+
+### Changed
+
+- OpenTelemetry context activation ([#202](https://github.com/tokio-rs/tracing-opentelemetry/pull/202))
+  - Trace ID and span ID can be obtained from `OtelData` via dedicated functions. Note that these
+    will be available only if the context has already been built. (#233)
+- Correctly track entered and exited state for timings ([#212](https://github.com/tokio-rs/tracing-opentelemetry/pull/212))
+- Slightly improve error message on version mismatch ([#211](https://github.com/tokio-rs/tracing-opentelemetry/pull/211))
+- Remove Lazy for thread_local static ([#215](https://github.com/tokio-rs/tracing-opentelemetry/pull/215))
+- Update description of special fields and semantic conventions
+
+### Breaking Changes
+
+- The attributes `code.filepath`, `code.lineno`, and `code.namespace` have been renamed to
+  `code.file.path`, and `code.line.number`, and `code.module.name`, to align with the opentelemetry
+  semantic conventions for code. ([#225](https://github.com/tokio-rs/tracing-opentelemetry/pull/225))
+- Upgrade from opentelemetry to 0.31.0. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry-sdk/CHANGELOG.md#0310)
+  for more information. ([#230](https://github.com/tokio-rs/tracing-opentelemetry/pull/230))
+- Hold onto `MetricsProvider` in `MetricsLayer` ([#224](https://github.com/tokio-rs/tracing-opentelemetry/pull/224))
+- The attribute `otel.status_message` was changed to `otel.status_description` to align with the
+  opentelemetry semantic conventions for code.  ([#209](https://github.com/tokio-rs/tracing-opentelemetry/pull/209))
+- Remove the `metrics_gauge_unstable` feature.
+
+
+# 0.31.0 (June 2, 2025)
+
+### Breaking Changes
+
+- Upgrade from opentelemetry 0.29.0 to 0.30.0. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry-sdk/CHANGELOG.md#0300)
+  for more information.
+
+### Added
+
+- Add `OpenTelemetrySpanExt::add_event` and `OpenTelemetrySpanExt::add_event_with_timestamp` 
+  functions to allow adding OpenTelemetry events directly to a `tracing::Span`, enabling the use of dynamic attribute keys 
+  and custom event timestamps.
+
+# 0.30.0 (March 23, 2025)
+
+### Breaking Changes
+
+- Upgrade from opentelemetry 0.28.0 to 0.29.0. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry-sdk/CHANGELOG.md#0290)
+  for more information.
+
+# 0.27.0 (October 9, 2024)
+
+### Breaking Changes
+
+- Upgrade to opentelemetry 0.26. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/releases/tag/opentelemetry-0.26.0)
+  for more information.
+
+# 0.26.0 (September 10, 2024)
+
+### Breaking Changes
+
+- Upgrade to opentelemetry 0.25. Refer to the upstream
+  [changelog](https://github.com/open-telemetry/opentelemetry-rust/releases/tag/opentelemetry-0.25.0)
+  for more information.
+
 # 0.25.0 (July 21, 2024)
 
 ### Breaking Changes
